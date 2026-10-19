@@ -1,0 +1,179 @@
+{
+  "name": "ETL-Student-data-clean",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "file upload",
+        "formDescription": "file upload for clean user data",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "fileUpload",
+              "fieldType": "file"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "id": "cef468a1-3c15-49f3-b462-0cd29cfec302",
+      "name": "On form submission",
+      "webhookId": "3ae44f11-84d4-4f4a-b765-5a43152dec1e"
+    },
+    {
+      "parameters": {
+        "binaryPropertyName": "fileUpload",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "b5896026-994c-43b3-ade5-cd142cae6d95",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a data-cleaning assistant. Clean and standardize this student record:\n- Trim extra spaces in all fields\n- Name: Title Case (e.g. \"Arun Kumar\")\n- Email: lowercase; leave empty if invalid\n- Phone: exactly 10 digits only (remove +91, spaces, dashes); leave empty if invalid\n- City: correct spelling in Title Case (e.g. \"Chenai\" → \"Chennai\", \"Bangalor\" → \"Bengaluru\")\n- Date of birth: format YYYY-MM-DD; leave empty if the date is impossible\n- Grade: the number 10\n- Marks: a number from 0 to 100; leave empty if invalid\n\nKeep exactly the same keys. Return ONLY a valid JSON object, no explanation, no code fences.\n\nRecord:\n{{ JSON.stringify($json) }}",
+        "batching": {
+          "batchSize": 5
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        448,
+        0
+      ],
+      "id": "dafc2a9b-cd3d-49df-99e1-7f133d4f1655",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.5-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        384,
+        208
+      ],
+      "id": "548bca12-4337-4384-9279-b0973147d768",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "L1E0HmgtN6lxkUvC",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turn each AI reply (text) back into a proper row\nconst original = $('Extract from File').all();\n\nreturn $input.all().map((item, i) => {\n  let raw = (item.json.text || '').trim();\n  // Remove ```json fences if the model added them\n  raw = raw.replace(/^```(?:json)?\\s*/i, '').replace(/\\s*```$/, '');\n  try {\n    return { json: JSON.parse(raw) };\n  } catch (e) {\n    // If the reply isn't valid JSON, keep the original row and flag it\n    return { json: { ...original[i].json, ai_error: 'Could not parse AI output' } };\n  }\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        0
+      ],
+      "id": "574e546c-3542-4434-a5a7-a8b2f0deba23",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "options": {
+          "fileName": "cleanedData.csv"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "db9ff76f-5b49-4059-a780-2098dacf1b4c",
+      "name": "Convert to File"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "4e58f3c8-47ae-4d6d-b249-8a5db5085fa8",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "0262bee3e72d4226c7df4168000ce67c07789c5afa7518cd7152d5afb61f2a34"
+  },
+  "nodeGroups": [],
+  "id": "zcDAHnx2hw36OLFB",
+  "tags": []
+}
